@@ -1,1 +1,1015 @@
-# b2
+<!DOCTYPE html>
+<html lang="th" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบเช็คชื่อนักเรียนด้วย QR Code & Dynamic OTP</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Google Fonts: Prompt -->
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Prompt', sans-serif; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Navigation Header -->
+    <header class="bg-indigo-700 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+                    <i data-lucide="qr-code" class="w-6 h-6 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Smart Check-In Pro</h1>
+                    <p class="text-xs text-indigo-200">ระบบเช็คชื่อ QR Code + Dynamic OTP</p>
+                </div>
+            </div>
+
+            <!-- View Switcher & Actions -->
+            <div class="flex items-center space-x-2 sm:space-x-4">
+                <div class="bg-indigo-900/50 p-1 rounded-xl flex items-center border border-indigo-400/30">
+                    <button id="nav-teacher-btn" onclick="switchRole('teacher')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex items-center space-x-1.5 bg-white text-indigo-700 shadow-sm">
+                        <i data-lucide="user-check" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">มุมมองคุณครู</span>
+                    </button>
+                    <button id="nav-student-btn" onclick="switchRole('student')" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex items-center space-x-1.5 text-indigo-200 hover:text-white">
+                        <i data-lucide="smartphone" class="w-4 h-4"></i>
+                        <span class="hidden sm:inline">มุมมองนักเรียน</span>
+                    </button>
+                </div>
+
+                <button onclick="confirmResetData()" class="p-2 text-indigo-200 hover:text-red-300 hover:bg-white/10 rounded-lg transition" title="รีเซ็ตข้อมูลเริ่มต้น">
+                    <i data-lucide="rotate-ccw" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        
+        <!-- TEACHER VIEW -->
+        <div id="teacher-view" class="space-y-6">
+            <!-- Navigation Tabs -->
+            <div class="flex border-b border-slate-200 space-x-4 sm:space-x-8 overflow-x-auto pb-1">
+                <button onclick="switchTeacherTab('session')" id="tab-btn-session" class="tab-btn font-semibold text-sm pb-3 text-indigo-600 border-b-2 border-indigo-600 flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="play-circle" class="w-4 h-4"></i>
+                    <span>เปิดคาบเช็คชื่อ (Active Session)</span>
+                </button>
+                <button onclick="switchTeacherTab('students')" id="tab-btn-students" class="tab-btn font-medium text-sm pb-3 text-slate-500 hover:text-slate-700 flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="users" class="w-4 h-4"></i>
+                    <span>จัดการรายชื่อนักเรียน</span>
+                    <span id="badge-total-students" class="bg-indigo-100 text-indigo-600 text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+                </button>
+                <button onclick="switchTeacherTab('classes')" id="tab-btn-classes" class="tab-btn font-medium text-sm pb-3 text-slate-500 hover:text-slate-700 flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                    <span>จัดการห้องเรียน & รายวิชา</span>
+                </button>
+                <button onclick="switchTeacherTab('reports')" id="tab-btn-reports" class="tab-btn font-medium text-sm pb-3 text-slate-500 hover:text-slate-700 flex items-center space-x-2 whitespace-nowrap">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                    <span>รายงานประวัติการเช็คชื่อ</span>
+                </button>
+            </div>
+
+            <!-- Tab 1: Active Session -->
+            <div id="teacher-tab-session" class="space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Control Box -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                                <i data-lucide="sliders" class="w-5 h-5 text-indigo-600"></i>
+                                <span>ตั้งค่าเปิดคาบเรียนใหม่</span>
+                            </h2>
+                            
+                            <form id="start-session-form" onsubmit="handleStartSession(event)" class="space-y-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1">เลือกห้องเรียน / รายวิชา</label>
+                                    <select id="session-class-select" required class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50">
+                                        <!-- Dynamic Options -->
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-600 mb-1">ระยะเวลาหมดอายุรหัส OTP</label>
+                                    <select id="session-duration" class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50">
+                                        <option value="15">15 วินาที (เปลี่ยนรหัสเร็วมาก)</option>
+                                        <option value="30" selected>30 วินาที (แนะนำ)</option>
+                                        <option value="60">60 วินาที</option>
+                                    </select>
+                                </div>
+                                <button type="submit" id="start-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+                                    <i data-lucide="play" class="w-5 h-5 fill-current"></i>
+                                    <span>เริ่มเปิดคาบเรียน & สุ่ม OTP</span>
+                                </button>
+                            </form>
+                        </div>
+
+                        <div id="active-session-summary" class="mt-6 pt-4 border-t border-slate-100 hidden">
+                            <div class="flex items-center justify-between text-xs text-slate-500 mb-2">
+                                <span>สถานะคาบเรียน:</span>
+                                <span class="text-emerald-600 font-semibold flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping mr-1.5"></span>กำลังดำเนินการ</span>
+                            </div>
+                            <button onclick="handleEndSession()" class="w-full bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 font-medium py-2 rounded-xl text-xs transition flex items-center justify-center space-x-1">
+                                <i data-lucide="square" class="w-3.5 h-3.5 fill-current"></i>
+                                <span>จบคาบเรียนนี้</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Display Dynamic OTP & QR Code -->
+                    <div class="lg:col-span-2 bg-gradient-to-br from-indigo-900 to-slate-900 p-6 rounded-2xl shadow-xl text-white flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+                        <div id="no-active-session" class="w-full py-12 text-center text-indigo-200 flex flex-col items-center">
+                            <i data-lucide="qr-code" class="w-16 h-16 mb-3 opacity-40"></i>
+                            <p class="text-sm">กรุณาเลือกห้องเรียนและกด "เริ่มเปิดคาบเรียน" เพื่อสร้าง QR Code และ OTP</p>
+                        </div>
+
+                        <div id="has-active-session" class="w-full flex flex-col sm:flex-row items-center justify-between gap-6 hidden">
+                            <!-- QR Code Holder -->
+                            <div class="bg-white p-4 rounded-2xl shadow-inner flex flex-col items-center shrink-0">
+                                <div id="qrcode" class="w-44 h-44 flex items-center justify-center"></div>
+                                <p class="text-xs text-slate-500 mt-2 font-medium">สแกนเปิดหน้าลงชื่อบนมือถือ</p>
+                            </div>
+
+                            <!-- OTP Display -->
+                            <div class="flex-1 text-center sm:text-left space-y-3">
+                                <div class="inline-block bg-indigo-500/30 text-indigo-300 text-xs px-3 py-1 rounded-full border border-indigo-400/30">
+                                    <span id="display-session-name">ห้อง ม.4/1 - วิชาคอมพิวเตอร์</span>
+                                </div>
+                                <h3 class="text-xs text-indigo-200 uppercase tracking-widest font-semibold"> Dynamic OTP Token</h3>
+                                
+                                <div class="flex items-center justify-center sm:justify-start space-x-3">
+                                    <span id="otp-display" class="font-mono text-5xl font-black tracking-widest text-amber-400 drop-shadow-md">------</span>
+                                </div>
+
+                                <div class="space-y-1">
+                                    <div class="flex justify-between text-xs text-indigo-200">
+                                        <span>รหัสจะเปลี่ยนใหม่ใน:</span>
+                                        <span id="timer-text" class="font-bold text-amber-300">30s</span>
+                                    </div>
+                                    <div class="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                                        <div id="timer-bar" class="bg-amber-400 h-full w-full transition-all duration-1000"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Real-time Attendance Monitor Grid -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+                        <div>
+                            <h3 class="font-bold text-slate-800 flex items-center space-x-2">
+                                <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-600"></i>
+                                <span>ตารางตรวจสอบการเช็คชื่อแบบเรียลไทม์</span>
+                            </h3>
+                            <p class="text-xs text-slate-500">รายชื่อนักเรียนทั้งหมดในห้องเรียนที่กำลังเปิดคาบ</p>
+                        </div>
+                        <div class="flex items-center space-x-3 text-xs">
+                            <span class="flex items-center text-slate-600"><span class="w-3 h-3 rounded-full bg-slate-200 inline-block mr-1"></span> ยังไม่เช็ค</span>
+                            <span class="flex items-center text-amber-600 font-medium"><span class="w-3 h-3 rounded-full bg-amber-400 inline-block mr-1"></span> สแกน OTP แล้ว</span>
+                            <span class="flex items-center text-emerald-600 font-bold"><span class="w-3 h-3 rounded-full bg-emerald-500 inline-block mr-1"></span> เช็คชื่อเรียบร้อย</span>
+                        </div>
+                    </div>
+
+                    <div id="attendance-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
+                        <div class="col-span-full py-8 text-center text-slate-400 text-sm">
+                            ยังไม่มีการเปิดคาบเรียนในขณะนี้
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Student Management -->
+            <div id="teacher-tab-students" class="space-y-6 hidden">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
+                    <div>
+                        <h3 class="font-bold text-indigo-900">จัดการรายชื่อนักเรียน (Student Management)</h3>
+                        <p class="text-xs text-indigo-700">เพิ่ม แก้ไข หรือนำเข้ารายชื่อนักเรียนแยกตามห้องเรียน</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="openAddStudentModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            <span>เพิ่มนักเรียน (ทีละคน)</span>
+                        </button>
+                        <button onclick="openBatchAddModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3.5 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm">
+                            <i data-lucide="file-text" class="w-4 h-4"></i>
+                            <span>คัดลอกวางรายชื่อ (Batch Add)</span>
+                        </button>
+                        <button onclick="addSampleStudents()" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3.5 py-2 rounded-xl transition flex items-center space-x-1 shadow-sm">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i>
+                            <span>เพิ่มรายชื่อตัวอย่าง</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter & Search -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between gap-4">
+                    <div class="w-full sm:w-64">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">เลือกกรองตามห้องเรียน</label>
+                        <select id="student-filter-class" onchange="renderStudentList()" class="w-full text-sm rounded-xl border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="ALL">แสดงนักเรียนทุกห้อง</option>
+                        </select>
+                    </div>
+                    <div class="w-full sm:w-64">
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">ค้นหา (รหัส หรือ ชื่อ)</label>
+                        <input type="text" id="student-search-input" onkeyup="renderStudentList()" placeholder="พิมพ์ชื่อเพื่อค้นหา..." class="w-full text-sm rounded-xl border-slate-300 border p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Students Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="p-3.5 pl-5">รหัสประจำตัว</th>
+                                    <th class="p-3.5">ชื่อ - นามสกุล</th>
+                                    <th class="p-3.5">ห้องเรียน</th>
+                                    <th class="p-3.5 text-right pr-5">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="student-table-body" class="divide-y divide-slate-100">
+                                <!-- Dynamic Student Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Classroom Management -->
+            <div id="teacher-tab-classes" class="space-y-6 hidden">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Add Class Form -->
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 h-fit">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center space-x-2">
+                            <i data-lucide="plus-circle" class="w-5 h-5 text-indigo-600"></i>
+                            <span>เพิ่มห้องเรียน / รายวิชา</span>
+                        </h3>
+                        <form id="add-class-form" onsubmit="handleAddClass(event)" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อห้องเรียน / ชั้นปี</label>
+                                <input type="text" id="input-class-name" placeholder="เช่น ม.4/1, ม.5/2" required class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อวิชา / รหัสวิชา</label>
+                                <input type="text" id="input-subject-name" placeholder="เช่น ว30101 วิทยาการคำนวณ" required class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            </div>
+                            <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-xl transition shadow-sm">
+                                บันทึกสร้างห้องเรียน
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Class List -->
+                    <div class="md:col-span-2 bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-slate-800 mb-4">รายชื่อห้องเรียนทั้งหมด</h3>
+                        <div id="classroom-list-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <!-- Dynamic Class Cards -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: History Reports -->
+            <div id="teacher-tab-reports" class="space-y-6 hidden">
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <div>
+                            <h3 class="font-bold text-slate-800">ประวัติการเช็คชื่อย้อนหลัง</h3>
+                            <p class="text-xs text-slate-500">บันทึกข้อมูลการเช็คชื่อที่เสร็จสมบูรณ์แล้ว</p>
+                        </div>
+                        <button onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition flex items-center space-x-2 shadow-sm">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>ส่งออกข้อมูล CSV / Excel</span>
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm text-slate-600">
+                            <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                                <tr>
+                                    <th class="p-3 pl-4">วันที่ / เวลา</th>
+                                    <th class="p-3">ห้องเรียน / วิชา</th>
+                                    <th class="p-3">นักเรียน</th>
+                                    <th class="p-3">สถานะการเช็คชื่อ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="divide-y divide-slate-100">
+                                <!-- Dynamic History Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STUDENT VIEW -->
+        <div id="student-view" class="max-w-md mx-auto space-y-6 hidden">
+            <div class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100 text-center space-y-5">
+                <div class="bg-indigo-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto text-indigo-600">
+                    <i data-lucide="user-check" class="w-8 h-8"></i>
+                </div>
+
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">ระบบเช็คชื่อนักเรียน</h2>
+                    <p class="text-xs text-slate-500 mt-1">กรอกรหัสประจำตัว และ รหัส Dynamic OTP 6 หลัก จากหน้าจอของคุณครู</p>
+                </div>
+
+                <form id="student-checkin-form" onsubmit="handleStudentSubmitOTP(event)" class="space-y-4 text-left">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">รหัสประจำตัวนักเรียน</label>
+                        <input type="text" id="student-input-id" placeholder="เช่น 1001" required class="w-full text-center text-lg tracking-widest font-semibold rounded-xl border-slate-300 border p-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">รหัส OTP (6 หลักจากหน้าจอครู)</label>
+                        <input type="text" id="student-input-otp" maxlength="6" placeholder="000000" required class="w-full text-center text-3xl font-mono tracking-widest font-bold text-indigo-600 rounded-xl border-slate-300 border p-3 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50">
+                    </div>
+
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3.5 rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-base">
+                        <i data-lucide="send" class="w-5 h-5"></i>
+                        <span>ส่งข้อมูลเช็คชื่อ</span>
+                    </button>
+                </form>
+
+                <div id="student-result-message" class="hidden p-4 rounded-xl text-sm font-medium"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Add Single Student -->
+    <div id="modal-add-student" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+            <div class="p-5 bg-indigo-600 text-white flex justify-between items-center">
+                <h3 class="font-bold">เพิ่มนักเรียนเข้าห้องเรียน</h3>
+                <button onclick="closeModal('modal-add-student')" class="text-indigo-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form onsubmit="handleSaveSingleStudent(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">เลือกห้องเรียน</label>
+                    <select id="single-student-class" required class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <!-- Options -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">รหัสประจำตัวนักเรียน</label>
+                    <input type="text" id="single-student-id" placeholder="เช่น 1001" required class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">ชื่อ - นามสกุล</label>
+                    <input type="text" id="single-student-name" placeholder="เช่น นายสมชาย ใจดี" required class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeModal('modal-add-student')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm">บันทึกข้อมูล</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Batch Add Students -->
+    <div id="modal-batch-add" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+            <div class="p-5 bg-emerald-600 text-white flex justify-between items-center">
+                <div>
+                    <h3 class="font-bold">เพิ่มรายชื่อนักเรียนแบบกลุ่ม (Batch Paste)</h3>
+                    <p class="text-xs text-emerald-100">คัดลอกรายชื่อมาวางได้หลายๆ คนในครั้งเดียว</p>
+                </div>
+                <button onclick="closeModal('modal-batch-add')" class="text-emerald-200 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <form onsubmit="handleSaveBatchStudents(event)" class="p-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">เลือกห้องเรียนที่ต้องการนำเข้า</label>
+                    <select id="batch-student-class" required class="w-full text-sm rounded-xl border-slate-300 border p-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                        <!-- Options -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">วางรายชื่อ (รูปแบบ: รหัสประจำตัว [เว้นวรรค/Tab] ชื่อ-นามสกุล)</label>
+                    <textarea id="batch-text-input" rows="6" placeholder="1001 นายสมชาย ใจดี&#10;1002 นางสาวสมหญิง รักเรียน&#10;1003 นายกิตติศักดิ์ มีสุข" required class="w-full font-mono text-xs rounded-xl border-slate-300 border p-3 focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                    <p class="text-xs text-slate-400 mt-1">* หากไม่มีรหัสประจำตัวใส่มาด้วย ระบบจะสร้างรหัสให้อัตโนมัติ</p>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeModal('modal-batch-add')" class="px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl">ยกเลิก</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm">นำเข้ารายชื่อทั้งหมด</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Data State Management
+        let appState = {
+            classrooms: [],
+            students: [],
+            activeSession: null,
+            history: []
+        };
+
+        let timerInterval = null;
+        let qrCodeInstance = null;
+
+        // Initialize System
+        window.onload = function () {
+            loadFromLocalStorage();
+            if (appState.classrooms.length === 0) {
+                initDefaultData();
+            }
+            lucide.createIcons();
+            updateAllDropdowns();
+            renderStudentList();
+            renderClassroomList();
+            renderHistoryList();
+            checkActiveSessionState();
+        };
+
+        // LocalStorage Handlers
+        function saveToLocalStorage() {
+            localStorage.setItem('smart_checkin_data', JSON.stringify(appState));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('smart_checkin_data');
+            if (saved) {
+                try {
+                    appState = JSON.parse(saved);
+                } catch(e) {
+                    console.error("Failed to load state", e);
+                }
+            }
+        }
+
+        function confirmResetData() {
+            if (confirm("คุณต้องการล้างข้อมูลทั้งหมดและเริ่มต้นใหม่ใช่หรือไม่?")) {
+                localStorage.removeItem('smart_checkin_data');
+                location.reload();
+            }
+        }
+
+        // Initialize Default Sample Data
+        function initDefaultData() {
+            appState.classrooms = [
+                { id: 'c1', name: 'ม.4/1', subject: 'ว30101 วิทยาการคำนวณ' },
+                { id: 'c2', name: 'ม.5/2', subject: 'ค31102 คณิตศาสตร์เพิ่มเติม' }
+            ];
+
+            appState.students = [
+                { id: '1001', name: 'นายกิตติพงษ์ ใจงาม', classId: 'c1' },
+                { id: '1002', name: 'นางสาวชลธิชา สุขสันต์', classId: 'c1' },
+                { id: '1003', name: 'นายธนกร วงศ์สว่าง', classId: 'c1' },
+                { id: '2001', name: 'นางสาวปรียาพร ดีเลิศ', classId: 'c2' },
+                { id: '2002', name: 'นายภานุวัฒน์ แสงทอง', classId: 'c2' }
+            ];
+
+            saveToLocalStorage();
+        }
+
+        // UI Role & Tab Switching
+        function switchRole(role) {
+            const teacherView = document.getElementById('teacher-view');
+            const studentView = document.getElementById('student-view');
+            const teacherBtn = document.getElementById('nav-teacher-btn');
+            const studentBtn = document.getElementById('nav-student-btn');
+
+            if (role === 'teacher') {
+                teacherView.classList.remove('hidden');
+                studentView.classList.add('hidden');
+                teacherBtn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex items-center space-x-1.5 bg-white text-indigo-700 shadow-sm";
+                studentBtn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex items-center space-x-1.5 text-indigo-200 hover:text-white";
+            } else {
+                teacherView.classList.add('hidden');
+                studentView.classList.remove('hidden');
+                studentBtn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex items-center space-x-1.5 bg-white text-indigo-700 shadow-sm";
+                teacherBtn.className = "px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 flex items-center space-x-1.5 text-indigo-200 hover:text-white";
+            }
+        }
+
+        function switchTeacherTab(tabName) {
+            ['session', 'students', 'classes', 'reports'].forEach(tab => {
+                document.getElementById(`teacher-tab-${tab}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-btn-${tab}`);
+                btn.className = "tab-btn font-medium text-sm pb-3 text-slate-500 hover:text-slate-700 flex items-center space-x-2 whitespace-nowrap";
+            });
+
+            document.getElementById(`teacher-tab-${tabName}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tabName}`);
+            activeBtn.className = "tab-btn font-semibold text-sm pb-3 text-indigo-600 border-b-2 border-indigo-600 flex items-center space-x-2 whitespace-nowrap";
+        }
+
+        // Dropdowns Sync Logic
+        function updateAllDropdowns() {
+            const sessionSelect = document.getElementById('session-class-select');
+            const filterSelect = document.getElementById('student-filter-class');
+            const singleSelect = document.getElementById('single-student-class');
+            const batchSelect = document.getElementById('batch-student-class');
+
+            let optionsHtml = appState.classrooms.map(c => 
+                `<option value="${c.id}">${c.name} - ${c.subject}</option>`
+            ).join('');
+
+            if (appState.classrooms.length === 0) {
+                optionsHtml = `<option value="">-- กรุณาสร้างห้องเรียนก่อน --</option>`;
+            }
+
+            sessionSelect.innerHTML = optionsHtml;
+            singleSelect.innerHTML = optionsHtml;
+            batchSelect.innerHTML = optionsHtml;
+
+            filterSelect.innerHTML = `<option value="ALL">แสดงนักเรียนทุกห้อง</option>` + appState.classrooms.map(c => 
+                `<option value="${c.id}">${c.name} - ${c.subject}</option>`
+            ).join('');
+
+            document.getElementById('badge-total-students').innerText = appState.students.length;
+        }
+
+        // Add Classroom
+        function handleAddClass(e) {
+            e.preventDefault();
+            const name = document.getElementById('input-class-name').value.trim();
+            const subject = document.getElementById('input-subject-name').value.trim();
+
+            if (!name || !subject) return;
+
+            const newClass = {
+                id: 'c_' + Date.now(),
+                name: name,
+                subject: subject
+            };
+
+            appState.classrooms.push(newClass);
+            saveToLocalStorage();
+            updateAllDropdowns();
+            renderClassroomList();
+
+            document.getElementById('add-class-form').reset();
+            alert(`เพิ่มห้องเรียน ${name} เรียบร้อยแล้ว!`);
+        }
+
+        function renderClassroomList() {
+            const container = document.getElementById('classroom-list-container');
+            if (appState.classrooms.length === 0) {
+                container.innerHTML = `<p class="text-sm text-slate-400 col-span-full">ยังไม่มีห้องเรียนในระบบ</p>`;
+                return;
+            }
+
+            container.innerHTML = appState.classrooms.map(c => {
+                const count = appState.students.filter(s => s.classId === c.id).length;
+                return `
+                    <div class="p-4 rounded-xl border border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-slate-800">${c.name}</h4>
+                            <p class="text-xs text-slate-500">${c.subject}</p>
+                            <span class="inline-block mt-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-md font-medium">นักเรียน ${count} คน</span>
+                        </div>
+                        <button onclick="deleteClassroom('${c.id}')" class="text-slate-400 hover:text-red-500 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function deleteClassroom(classId) {
+            if (confirm("ต้องการลบห้องเรียนนี้? รายชื่อนักเรียนในห้องนี้จะถูกลบไปด้วย")) {
+                appState.classrooms = appState.classrooms.filter(c => c.id !== classId);
+                appState.students = appState.students.filter(s => s.classId !== classId);
+                saveToLocalStorage();
+                updateAllDropdowns();
+                renderClassroomList();
+                renderStudentList();
+            }
+        }
+
+        // Student Management (Single & Batch Modal Triggers)
+        function openAddStudentModal() {
+            if (appState.classrooms.length === 0) {
+                alert("กรุณาสร้างห้องเรียนก่อนเพิ่มนักเรียน");
+                switchTeacherTab('classes');
+                return;
+            }
+            document.getElementById('modal-add-student').classList.remove('hidden');
+        }
+
+        function openBatchAddModal() {
+            if (appState.classrooms.length === 0) {
+                alert("กรุณาสร้างห้องเรียนก่อนเพิ่มนักเรียน");
+                switchTeacherTab('classes');
+                return;
+            }
+            document.getElementById('modal-batch-add').classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function handleSaveSingleStudent(e) {
+            e.preventDefault();
+            const classId = document.getElementById('single-student-class').value;
+            const studentId = document.getElementById('single-student-id').value.trim();
+            const name = document.getElementById('single-student-name').value.trim();
+
+            if (appState.students.some(s => s.id === studentId)) {
+                alert("รหัสประจำตัวนี้นำเข้าไว้แล้ว กรุณาใช้รหัสอื่น");
+                return;
+            }
+
+            appState.students.push({ id: studentId, name: name, classId: classId });
+            saveToLocalStorage();
+            updateAllDropdowns();
+            renderStudentList();
+            closeModal('modal-add-student');
+            document.getElementById('single-student-id').value = '';
+            document.getElementById('single-student-name').value = '';
+        }
+
+        function handleSaveBatchStudents(e) {
+            e.preventDefault();
+            const classId = document.getElementById('batch-student-class').value;
+            const rawText = document.getElementById('batch-text-input').value.trim();
+
+            if (!rawText) return;
+
+            const lines = rawText.split('\n');
+            let addedCount = 0;
+
+            lines.forEach((line, index) => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+
+                const parts = trimmed.split(/[\t\s]+/);
+                let id, name;
+
+                if (parts.length >= 2 && !isNaN(parts[0])) {
+                    id = parts[0];
+                    name = parts.slice(1).join(' ');
+                } else {
+                    id = (Date.now() + index).toString().slice(-4);
+                    name = trimmed;
+                }
+
+                if (!appState.students.some(s => s.id === id)) {
+                    appState.students.push({ id: id, name: name, classId: classId });
+                    addedCount++;
+                }
+            });
+
+            saveToLocalStorage();
+            updateAllDropdowns();
+            renderStudentList();
+            closeModal('modal-batch-add');
+            document.getElementById('batch-text-input').value = '';
+            alert(`นำเข้ารายชื่อนักเรียนสำเร็จจำนวน ${addedCount} คน!`);
+        }
+
+        function addSampleStudents() {
+            if (appState.classrooms.length === 0) {
+                alert("กรุณาสร้างห้องเรียนก่อนเพิ่มข้อมูลตัวอย่าง");
+                return;
+            }
+            const targetClassId = appState.classrooms[0].id;
+            const samples = [
+                { name: 'นายธนาธิป มีสุข' },
+                { name: 'นางสาววิภาดา เจริญยิ่ง' },
+                { name: 'นาย ณัฐวุฒิ สุขสวัสดิ์' },
+                { name: 'นางสาวกัญญารัตน์ มั่นคง' }
+            ];
+
+            samples.forEach((s, idx) => {
+                const sampleId = (1000 + appState.students.length + idx + 1).toString();
+                if (!appState.students.some(st => st.id === sampleId)) {
+                    appState.students.push({ id: sampleId, name: s.name, classId: targetClassId });
+                }
+            });
+
+            saveToLocalStorage();
+            updateAllDropdowns();
+            renderStudentList();
+            alert("เพิ่มนักเรียนตัวอย่างเรียบร้อยแล้ว!");
+        }
+
+        function renderStudentList() {
+            const filterClass = document.getElementById('student-filter-class').value;
+            const searchText = document.getElementById('student-search-input').value.toLowerCase();
+            const tbody = document.getElementById('student-table-body');
+
+            let filtered = appState.students;
+
+            if (filterClass !== 'ALL') {
+                filtered = filtered.filter(s => s.classId === filterClass);
+            }
+
+            if (searchText) {
+                filtered = filtered.filter(s => s.id.toLowerCase().includes(searchText) || s.name.toLowerCase().includes(searchText));
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400">ไม่พบรายชื่อนักเรียน</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(s => {
+                const classroom = appState.classrooms.find(c => c.id === s.classId);
+                const className = classroom ? classroom.name : 'ไม่ระบุ';
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="p-3.5 pl-5 font-mono text-xs font-semibold text-slate-700">${s.id}</td>
+                        <td class="p-3.5 font-medium text-slate-800">${s.name}</td>
+                        <td class="p-3.5"><span class="bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-lg font-medium">${className}</span></td>
+                        <td class="p-3.5 text-right pr-5">
+                            <button onclick="deleteStudent('${s.id}')" class="text-slate-400 hover:text-red-500 p-1"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        function deleteStudent(studentId) {
+            if (confirm(`ต้องการลบนักเรียนรหัส ${studentId} หรือไม่?`)) {
+                appState.students = appState.students.filter(s => s.id !== studentId);
+                saveToLocalStorage();
+                updateAllDropdowns();
+                renderStudentList();
+            }
+        }
+
+        // Dynamic OTP Generator & Active Session Handling
+        function generateOTP() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        function handleStartSession(e) {
+            e.preventDefault();
+            const classId = document.getElementById('session-class-select').value;
+            const duration = parseInt(document.getElementById('session-duration').value);
+
+            if (!classId) {
+                alert("กรุณาสร้างหรือเลือกห้องเรียนก่อนเริ่มคาบ");
+                return;
+            }
+
+            const classroom = appState.classrooms.find(c => c.id === classId);
+
+            // Get students of this class
+            const classStudents = appState.students.filter(s => s.classId === classId);
+
+            if (classStudents.length === 0) {
+                alert("ห้องเรียนนี้ยังไม่มีรายชื่อนักเรียน กรุณาเพิ่มนักเรียนในเมนู 'จัดการรายชื่อนักเรียน' ก่อนเปิดคาบ");
+                switchTeacherTab('students');
+                return;
+            }
+
+            appState.activeSession = {
+                classId: classId,
+                className: `${classroom.name} - ${classroom.subject}`,
+                currentOTP: generateOTP(),
+                duration: duration,
+                timerLeft: duration,
+                attendance: classStudents.map(s => ({
+                    studentId: s.id,
+                    name: s.name,
+                    status: 'PENDING', // PENDING, CHECKED
+                    checkInTime: null
+                }))
+            };
+
+            saveToLocalStorage();
+            startOTPTimer();
+            renderActiveSessionUI();
+        }
+
+        function startOTPTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+
+            timerInterval = setInterval(() => {
+                if (!appState.activeSession) {
+                    clearInterval(timerInterval);
+                    return;
+                }
+
+                appState.activeSession.timerLeft--;
+                if (appState.activeSession.timerLeft <= 0) {
+                    appState.activeSession.currentOTP = generateOTP();
+                    appState.activeSession.timerLeft = appState.activeSession.duration;
+                }
+
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            if (!appState.activeSession) return;
+            const timerText = document.getElementById('timer-text');
+            const timerBar = document.getElementById('timer-bar');
+            const otpDisplay = document.getElementById('otp-display');
+
+            otpDisplay.innerText = appState.activeSession.currentOTP;
+            timerText.innerText = `${appState.activeSession.timerLeft}s`;
+
+            const percent = (appState.activeSession.timerLeft / appState.activeSession.duration) * 100;
+            timerBar.style.width = `${percent}%`;
+        }
+
+        function renderActiveSessionUI() {
+            const noSession = document.getElementById('no-active-session');
+            const hasSession = document.getElementById('has-active-session');
+            const summary = document.getElementById('active-session-summary');
+
+            if (!appState.activeSession) {
+                noSession.classList.remove('hidden');
+                hasSession.classList.add('hidden');
+                summary.classList.add('hidden');
+                document.getElementById('attendance-grid').innerHTML = `<div class="col-span-full py-8 text-center text-slate-400 text-sm">ยังไม่มีการเปิดคาบเรียนในขณะนี้</div>`;
+                return;
+            }
+
+            noSession.classList.add('hidden');
+            hasSession.classList.remove('hidden');
+            summary.classList.remove('hidden');
+
+            document.getElementById('display-session-name').innerText = appState.activeSession.className;
+            updateTimerDisplay();
+
+            // Generate QR Code
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            qrCodeInstance = new QRCode(qrContainer, {
+                text: window.location.href,
+                width: 160,
+                height: 160,
+                colorDark : "#1e1b4b",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            renderAttendanceGrid();
+        }
+
+        function checkActiveSessionState() {
+            if (appState.activeSession) {
+                startOTPTimer();
+                renderActiveSessionUI();
+            }
+        }
+
+        function handleEndSession() {
+            if (!appState.activeSession) return;
+            if (confirm("ยืนยันจบคาบเรียนนี้? ข้อมูลการเช็คชื่อจะถูกบันทึกลงประวัติย้อนหลัง")) {
+                const record = {
+                    id: 'hist_' + Date.now(),
+                    timestamp: new Date().toLocaleString('th-TH'),
+                    className: appState.activeSession.className,
+                    attendance: appState.activeSession.attendance
+                };
+
+                appState.history.unshift(record);
+                appState.activeSession = null;
+                if (timerInterval) clearInterval(timerInterval);
+                saveToLocalStorage();
+                renderActiveSessionUI();
+                renderHistoryList();
+                alert("บันทึกข้อมูลประวัติเรียบร้อยแล้ว!");
+            }
+        }
+
+        function renderAttendanceGrid() {
+            const grid = document.getElementById('attendance-grid');
+            if (!appState.activeSession) return;
+
+            grid.innerHTML = appState.activeSession.attendance.map(item => {
+                let badgeClass = "bg-slate-100 text-slate-500 border-slate-200";
+                let statusText = "ยังไม่เช็ค";
+                let icon = `<i data-lucide="clock" class="w-4 h-4 text-slate-400"></i>`;
+
+                if (item.status === 'CHECKED') {
+                    badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold";
+                    statusText = item.checkInTime;
+                    icon = `<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600"></i>`;
+                }
+
+                return `
+                    <div class="p-3 rounded-xl border ${badgeClass} flex items-center justify-between transition-all duration-300">
+                        <div class="truncate mr-2">
+                            <p class="text-xs font-mono font-semibold opacity-70">${item.studentId}</p>
+                            <p class="text-xs font-medium truncate">${item.name}</p>
+                        </div>
+                        <div class="flex items-center space-x-1 shrink-0">
+                            ${icon}
+                            <span class="text-xs">${statusText}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        // Student Side OTP Submit Function
+        function handleStudentSubmitOTP(e) {
+            e.preventDefault();
+            const studentId = document.getElementById('student-input-id').value.trim();
+            const inputOTP = document.getElementById('student-input-otp').value.trim();
+            const msgBox = document.getElementById('student-result-message');
+
+            msgBox.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'bg-red-100', 'text-red-800');
+
+            if (!appState.activeSession) {
+                msgBox.classList.add('bg-red-100', 'text-red-800');
+                msgBox.innerText = "❌ คุณครูยังไม่เปิดคาบเรียนในขณะนี้";
+                return;
+            }
+
+            if (inputOTP !== appState.activeSession.currentOTP) {
+                msgBox.classList.add('bg-red-100', 'text-red-800');
+                msgBox.innerText = "❌ รหัส OTP ไม่ถูกต้องหรือหมดอายุแล้ว";
+                return;
+            }
+
+            const targetStudent = appState.activeSession.attendance.find(s => s.studentId === studentId);
+
+            if (!targetStudent) {
+                msgBox.classList.add('bg-red-100', 'text-red-800');
+                msgBox.innerText = "❌ ไม่พบรหัสประจำตัวนี้ในคาบเรียนปัจจุบัน";
+                return;
+            }
+
+            if (targetStudent.status === 'CHECKED') {
+                msgBox.classList.add('bg-emerald-100', 'text-emerald-800');
+                msgBox.innerText = `⚠️ นักเรียน ${targetStudent.name} เช็คชื่อเรียบร้อยแล้วก่อนหน้านี้ (${targetStudent.checkInTime})`;
+                return;
+            }
+
+            // Success Check-in
+            targetStudent.status = 'CHECKED';
+            targetStudent.checkInTime = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+            saveToLocalStorage();
+            renderAttendanceGrid();
+
+            msgBox.classList.add('bg-emerald-100', 'text-emerald-800');
+            msgBox.innerText = `🟢 เช็คชื่อสำเร็จ! ขอบคุณ ${targetStudent.name} (บันทึกเวลา ${targetStudent.checkInTime})`;
+            document.getElementById('student-input-otp').value = '';
+        }
+
+        // History & CSV Export
+        function renderHistoryList() {
+            const tbody = document.getElementById('history-table-body');
+            if (appState.history.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400">ยังไม่มีประวัติการเช็คชื่อที่เสร็จสมบูรณ์</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = appState.history.map(h => {
+                const total = h.attendance.length;
+                const checked = h.attendance.filter(a => a.status === 'CHECKED').length;
+                return `
+                    <tr class="hover:bg-slate-50 border-b border-slate-100">
+                        <td class="p-3 pl-4 text-xs font-medium text-slate-500">${h.timestamp}</td>
+                        <td class="p-3 font-semibold text-slate-800">${h.className}</td>
+                        <td class="p-3 text-xs"><span class="font-bold text-emerald-600">${checked}</span> / ${total} คน</td>
+                        <td class="p-3">
+                            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-2.5 py-1 rounded-full font-medium">เสร็จสิ้น</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function exportToCSV() {
+            if (appState.history.length === 0) {
+                alert("ไม่มีข้อมูลประวัติให้ส่งออก");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+            csvContent += "วันที่-เวลา,ห้องเรียน/วิชา,รหัสประจำตัว,ชื่อ-นามสกุล,สถานะ,เวลาเช็คชื่อ\n";
+
+            appState.history.forEach(h => {
+                h.attendance.forEach(a => {
+                    const statusText = a.status === 'CHECKED' ? 'มาเรียน' : 'ขาดเรียน';
+                    const timeText = a.checkInTime || '-';
+                    csvContent += `"${h.timestamp}","${h.className}","${a.studentId}","${a.name}","${statusText}","${timeText}"\n`;
+                });
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `attendance_report_${Date.now()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
